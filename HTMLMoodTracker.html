@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mood Canvas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #f0f4f8, #d9e2ec);
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #4a90e2;
+        }
+        #canvas {
+            border: 2px solid #4a90e2;
+            border-radius: 8px;
+            background: white;
+            cursor: crosshair;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="color"], input[type="text"], button {
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #357ab8;
+        }
+        .mood-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            width: 100%;
+        }
+        .mood-item {
+            position: relative;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .mood-item img {
+            width: 100%;
+            height: auto;
+        }
+        .delete-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(255, 0, 0, 0.7);
+            border: none;
+            color: white;
+            border-radius: 50%;
+            cursor: pointer;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mood Canvas</h1>
+    <canvas id="canvas" width="400" height="400"></canvas>
+    <div class="controls">
+        <input type="color" id="colorPicker" value="#4a90e2" />
+        <input type="text" id="note" placeholder="Mood Note" />
+        <button id="saveButton">Save Mood</button>
+    </div>
+    <div class="mood-list" id="moodList"></div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const colorPicker = document.getElementById('colorPicker');
+        const noteInput = document.getElementById('note');
+        const saveButton = document.getElementById('saveButton');
+        const moodList = document.getElementById('moodList');
+
+        let drawing = false;
+
+        canvas.addEventListener('mousedown', (e) => {
+            drawing = true;
+            draw(e);
+        });
+
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', () => drawing = false);
+        canvas.addEventListener('mouseout', () => drawing = false);
+
+        function draw(e) {
+            if (!drawing) return;
+            ctx.fillStyle = colorPicker.value;
+            ctx.beginPath();
+            ctx.arc(e.offsetX, e.offsetY, 10, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        async function fetchMoods() {
+            const response = await fetch('/api/moods');
+            const moods = await response.json();
+            renderMoods(moods);
+        }
+
+        function renderMoods(moods) {
+            moodList.innerHTML = '';
+            moods.forEach(mood => {
+                const moodItem = document.createElement('div');
+                moodItem.className = 'mood-item';
+                moodItem.innerHTML = `
+                    <img src="${mood.canvas_data}" alt="Mood Canvas" />
+                    <button class="delete-btn" onclick="deleteMood(${mood.id})">×</button>
+                `;
+                moodList.appendChild(moodItem);
+            });
+        }
+
+        saveButton.addEventListener('click', async () => {
+            const canvasData = canvas.toDataURL();
+            const note = noteInput.value;
+
+            await fetch('/api/moods', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ canvas_data: canvasData, note }),
+            });
+
+            noteInput.value = '';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            fetchMoods();
+        });
+
+        async function deleteMood(id) {
+            await fetch(`/api/moods/${id}`, { method: 'DELETE' });
+            fetchMoods();
+        }
+
+        fetchMoods();
+    </script>
+</body>
+</html>
